@@ -14,6 +14,11 @@ add_definitions(-DOMPI_SKIP_MPICXX)
 
 add_subdirectory(src/common)
 
+add_executable(test
+    src/test/main.c)
+target_link_libraries(test
+    common)
+
 add_executable(secuencial
     src/secuencial/main.c)
 target_link_libraries(secuencial
