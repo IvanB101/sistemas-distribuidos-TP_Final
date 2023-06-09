@@ -1,7 +1,11 @@
+#ifndef COMMON
+#define COMMON
+
 #include <stdint.h>
 
 #define min(X, Y) (((X) < (Y)) ? (X) : (Y))
 #define max(X, Y) (((X) > (Y)) ? (X) : (Y))
+#define ceil_div(X, Y) (((X) % (Y)) ? (X / Y + 1) : (X / Y))
 #define sqr(X) (X * X)
 
 typedef struct {
@@ -16,3 +20,9 @@ typedef struct {
   cell *old_state;
   cell *new_state;
 } automata;
+
+void print_state(automata a);
+
+void print_usage();
+
+#endif // !COMMON

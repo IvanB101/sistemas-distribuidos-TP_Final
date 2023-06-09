@@ -12,29 +12,36 @@ find_package(MPI REQUIRED)
 # Following line only if using OpenMPI
 add_definitions(-DOMPI_SKIP_MPICXX)
 
+add_subdirectory(src/common)
+
 add_executable(secuencial
     src/secuencial/main.c)
+target_link_libraries(secuencial
+    common)
 
-add_executable(MPI
-    src/MPI/main.c)
+add_executable(mpi
+    src/mpi/main.c)
+target_link_libraries(mpi PRIVATE
+    common)
 
-add_executable(OpenMP
-    src/OpenMP/main.c)
+add_executable(openmp
+    src/openmp/main.c)
+target_link_libraries(openmp 
+    common)
 
-add_executable(Mixed
-    src/Mixed/main.c)
+add_executable(mixed 
+    src/mixed/main.c)
+target_link_libraries(mixed PRIVATE
+    common)
 
 # Linking MPI libraries
-target_link_libraries(MPI PRIVATE
+target_link_libraries(mpi PRIVATE
     ${MPI_C_LIBRARIES})
-target_include_directories(MPI PRIVATE
+target_include_directories(mpi PRIVATE
     ${MPI_C_INCLUDE_PATH}) 
 
-target_link_libraries(Mixed PRIVATE
+target_link_libraries(mixed PRIVATE
     ${MPI_C_LIBRARIES})
-target_include_directories(Mixed PRIVATE
+target_include_directories(mixed PRIVATE
     ${MPI_C_INCLUDE_PATH}) 
 
-# add_library(c_procedures STATIC)
-# target_include_directories(c_procedures PUBLIC
-#     ${CMAKE_CURRENT_LIST_DIR})
