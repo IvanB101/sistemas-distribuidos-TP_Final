@@ -5,16 +5,13 @@
 #include <stdlib.h>
 
 int main(int argc, char **argv) {
-  int thread_cant = omp_get_num_procs();
-  omp_set_num_threads(thread_cant);
+  cell *ptr = NULL;
+  cell *sec = NULL;
 
-  printf("Threads: %d\n", thread_cant);
+  sec += 5;
+  ptr += 10;
 
-#pragma omp parallel
-  {
-    int id = omp_get_thread_num();
-    printf("Thread: %d\n", id);
-  }
+  printf("Cell %ld Diff %ld", ptr, ptr - sec);
 
   return 0;
 }
