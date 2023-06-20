@@ -4,10 +4,30 @@
 #include <stdlib.h>
 
 void print_state(automata a) {
+  double range = 272.0 * 2 / 5;
+
   for (int i = 0; i < a.rows * a.columns; i++) {
-    cell c = a.old_state[i];
-    printf("S: %d\tC: %.2f\tT: %.2f\n", c.sign, c.conductivity, c.temperature);
+    if (!(i % a.columns)) {
+      printf("\n");
+    }
+    double temp = a.old_state[i].temperature + 272;
+    if (temp < range) {
+      printf("\033[34m■ \033[0m");
+    } else if (temp < 2 * range) {
+      printf("\033[96m■ \033[0m");
+    } else if (temp < 3 * range) {
+      printf("\033[90m■ \033[0m");
+    } else if (temp < 4 * range) {
+      printf("\033[31m■ \033[0m");
+    } else {
+      printf("\033[93m■ \033[0m");
+    }
   }
+  printf("\n");
+}
+
+void print_conduc(automata a) {
+  // TODO
 }
 
 void print_part_state(automata_part a) {
@@ -36,4 +56,13 @@ void print_usage() {
   printf("\t-lado_matriz: cantidad de celdas por lado de la matriz\n");
   printf("\t-pasos: cantidad de pasos a simular (100 por defecto)\n");
   exit(-1);
+}
+
+void restric_temp(double *temp) {
+  if (*temp > 272.0) {
+    *temp = 272.0;
+  }
+  if (*temp < -272.0) {
+    *temp = -272.0;
+  }
 }

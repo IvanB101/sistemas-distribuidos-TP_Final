@@ -5,13 +5,7 @@
 #include <stdlib.h>
 
 int main(int argc, char **argv) {
-  cell *ptr = NULL;
-  cell *sec = NULL;
-
-  sec += 5;
-  ptr += 10;
-
-  printf("Cell %ld Diff %ld", ptr, ptr - sec);
+  int hola;
 
   return 0;
 }

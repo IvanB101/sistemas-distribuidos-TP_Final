@@ -33,10 +33,14 @@ typedef struct {
 
 void print_state(automata a);
 
+void print_conduc(automata a);
+
 void print_part_state(automata_part a);
 
 void print_full_part_state(automata_part a);
 
 void print_usage();
+
+void restric_temp(double *temp);
 
 #endif // !COMMON

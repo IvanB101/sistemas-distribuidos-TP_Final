@@ -6,15 +6,22 @@
 #include <stdlib.h>
 #include <time.h>
 
+#define SHOW_INICIAL 0
+#define SHOW_FINAL 0
+#define SHOW_STEPS 0
+#define STEP 1
+#define SIGN_FLIP 1
+#define GROWTH_FACTOR 50
+
+void master(automata_part *a, int id, int n_proc, int steps);
+
+void slave(automata_part *a, int id, int n_proc, int steps);
+
 void init(automata_part *a, int id, int n_proc);
 
 void apply_rules(automata_part *a, int id, int n_proc);
 
 void sinc_parts(automata_part *a, int id, int n_proc);
-
-void join_parts(automata_part *a, int id, int n_proc);
-
-void calc_time(int id, int n_proc, clock_t start);
 
 void update(automata_part *a);
 
@@ -47,34 +54,110 @@ int main(int argc, char **argv) {
   sinc_parts(&a, id, n_proc);
   update(&a);
 
-  for (int i = 0; i < steps; i++) {
-    apply_rules(&a, id, n_proc);
-    sinc_parts(&a, id, n_proc);
-    update(&a);
+  if (id == 0) {
+    master(&a, id, n_proc, steps);
+  } else {
+    slave(&a, id, n_proc, steps);
+  }
+
+  if (id == 0) {
+  } else {
   }
 
   free_automata(&a);
-
-  calc_time(id, n_proc, start);
 
   MPI_Finalize();
 
   return 0;
 }
 
+void master(automata_part *a, int id, int n_proc, int steps) {
+  int count = a->size * sizeof(cell);
+  automata full = {
+      .rows = a->rows,
+      .columns = a->rows,
+      .old_state = malloc(a->rows * a->columns * sizeof(cell)),
+      .new_state = NULL,
+  };
+
+#if SHOW_INICIAL
+  MPI_Gather(a->old_state + a->first, count, MPI_BYTE, full.old_state, count,
+             MPI_BYTE, 0, MPI_COMM_WORLD);
+  print_state(full);
+#endif
+
+  for (int i = 0; i < steps; i++) {
+    apply_rules(a, id, n_proc);
+    sinc_parts(a, id, n_proc);
+    update(a);
+#if SHOW_STEPS
+    if (!(i % STEP)) {
+      MPI_Gather(a->old_state + a->first, count, MPI_BYTE, full.old_state,
+                 count, MPI_BYTE, 0, MPI_COMM_WORLD);
+      print_state(full);
+    }
+#endif
+  }
+
+#if SHOW_FINAL
+  MPI_Gather(a->old_state + a->first, count, MPI_BYTE, full.old_state, count,
+             MPI_BYTE, 0, MPI_COMM_WORLD);
+  print_state(full);
+#endif
+
+  free(full.old_state);
+}
+
+void slave(automata_part *a, int id, int n_proc, int steps) {
+#if SHOW_INICIAL
+  MPI_Gather(a->old_state + a->first, a->size * sizeof(cell), MPI_BYTE, NULL, 0,
+             MPI_BYTE, 0, MPI_COMM_WORLD);
+#endif
+
+  for (int i = 0; i < steps; i++) {
+    apply_rules(a, id, n_proc);
+    sinc_parts(a, id, n_proc);
+    update(a);
+#if SHOW_STEPS
+    if (!(i % STEP)) {
+      MPI_Gather(a->old_state + a->first, a->size * sizeof(cell), MPI_BYTE,
+                 NULL, 0, MPI_BYTE, 0, MPI_COMM_WORLD);
+    }
+#endif
+  }
+
+#if SHOW_FINAL
+  MPI_Gather(a->old_state + a->first, a->size * sizeof(cell), MPI_BYTE, NULL, 0,
+             MPI_BYTE, 0, MPI_COMM_WORLD);
+#endif
+}
+
 void init(automata_part *a, int id, int n_proc) {
   srand(time(NULL));
 
-  uint32_t rows_per_proc = ceil_div(a->rows, n_proc),
-           my_rows = (id == n_proc - 1 ? a->rows - (n_proc - 1) * rows_per_proc
-                                       : rows_per_proc),
-           neighbor_rows = 2, neighbors = (id == 0 || id == n_proc - 1 ? 1 : 2);
+  uint32_t rows_per_proc = ceil_div(a->rows, n_proc), my_rows = rows_per_proc,
+           neighbor_rows = 2, neighbors = 2;
 
-  a->first = (id == 0 ? 0 : a->columns * neighbor_rows);
+  a->first = a->columns * neighbor_rows;
+
+  uint32_t rem_rows = a->rows - (rows_per_proc * (n_proc - 1));
+
+  if (id == 0) {
+    neighbors = 1;
+    a->first = 0;
+  }
+  if (id == n_proc - 1) {
+    neighbors = 1;
+    my_rows = rem_rows;
+  }
+
   a->size = my_rows * a->columns;
-  a->full_size = (a->size + neighbor_rows * neighbors * a->columns);
+
   if (id == n_proc - 2) {
-    a->full_size -= (a->rows - (n_proc - 1) * rows_per_proc) * a->columns;
+    a->full_size =
+        (a->size + (neighbor_rows + min(neighbor_rows, rem_rows)) * a->columns);
+  } else {
+    a->full_size = (a->size + neighbor_rows * neighbors * a->columns);
   }
 
   a->new_state = (cell *)malloc(sizeof(cell) * a->full_size);
@@ -128,13 +211,17 @@ void apply_rules(automata_part *a, int id, int n_proc) {
       sum += partial_sum;
     }
 
-    cell *new_cell = &a->new_state[row * my_rows + col];
-    new_cell->temperature =
-        curr_cell.temperature + curr_cell.sign / (double)sqr(24) * sum;
+    cell *new_cell = &a->new_state[i];
+    new_cell->temperature = curr_cell.temperature + curr_cell.sign /
+                                                        (double)sqr(24) * sum *
+                                                        GROWTH_FACTOR;
+    restric_temp(&new_cell->temperature);
 
+#if SIGN_FLIP
     if (rand() <= RAND_MAX / 10) {
       new_cell->sign = curr_cell.sign * (-1);
     }
+#endif
   }
 }
 
@@ -142,11 +229,27 @@ void sinc_parts(automata_part *a, int id, int n_proc) {
   cell *p_recv_buff = a->new_state, *p_send_buff = a->new_state + a->first,
        *n_recv_buff = p_send_buff + a->size,
        *n_send_buff = n_recv_buff - (a->full_size - a->first - a->size);
-  uint32_t p_recv_size = a->first * sizeof(cell),
+  uint64_t p_recv_size = a->first * sizeof(cell),
            p_send_size = min(a->first, a->size) * sizeof(cell),
            n_recv_size = (a->full_size - a->first - a->size) * sizeof(cell),
-           n_send_size =
-               (id == 0 ? a->full_size - a->size : a->first) * sizeof(cell);
+           n_send_size = a->first * sizeof(cell);
+
+  if (id == 0) {
+    p_recv_buff = NULL;
+    n_send_size = (a->full_size - a->size) * sizeof(cell);
+  }
+  if (id == n_proc - 1) {
+    n_send_buff = NULL;
+    n_send_size = 0;
+  }
+
+  /*
+  printf("thread: %d\tfull size: %d\tfirst: %d\tsize: %d\t", id, a->full_size,
+         a->first, a->size);
+
+  printf("pr: %ld\tps: %ld\tnr: %ld\tns: %ld\n", p_recv_size, p_send_size,
+         n_recv_size, n_send_size);
+  */
 
   if (id == 0) {
     MPI_Send(n_send_buff, n_send_size, MPI_BYTE, id + 1, 0, MPI_COMM_WORLD);
@@ -164,18 +267,6 @@ void sinc_parts(automata_part *a, int id, int n_proc) {
     MPI_Recv(n_recv_buff, n_recv_size, MPI_BYTE, id + 1, 0, MPI_COMM_WORLD,
              MPI_STATUS_IGNORE);
   }
-}
-
-void join_parts(automata_part *a, int id, int n_proc) {
-  // TODO
-  if (id == 0) {
-
-  } else {
-  }
-}
-
-void calc_time(int id, int n_proc, clock_t start) {
-  // TODO
 }
 
 void update(automata_part *a) {

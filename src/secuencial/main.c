@@ -5,13 +5,21 @@
 #include <stdlib.h>
 #include <time.h>
 
+#define SHOW_INICIAL 0
+#define SHOW_FINAL 0
+#define SHOW_STEPS 0
+#define SHOW_CHANGE 1
+#define STEP 1
+#define SIGN_FLIP 1
+#define GROWTH_FACTOR 50
+
 void init(automata *a);
 
-void apply_rules(automata *a);
+double apply_rules(automata *a);
 
 void update(automata *a);
 
-void free_automata(automata *a);
+void free_automata_part(automata *a);
 
 int main(int argc, char **argv) {
   uint32_t rows, columns, steps = 100;
@@ -34,12 +42,30 @@ int main(int argc, char **argv) {
 
   init(&a);
 
+#if SHOW_INICIAL
+  print_state(a);
+#endif
+
   for (int i = 0; i < steps; i++) {
+#if SHOW_CHANGE
+    double change = apply_rules(&a);
+    printf("Change: %lf", change);
+#else
     apply_rules(&a);
+#endif
     update(&a);
+#if SHOW_STEPS
+    if (!(i % STEP)) {
+      print_state(a);
+    }
+#endif
   }
 
-  free_automata(&a);
+#if SHOW_INICIAL
+  print_state(a);
+#endif
+
+  free_automata_part(&a);
 
   end = clock();
   exec_time = ((double)end - start) / CLOCKS_PER_SEC;
@@ -68,7 +94,11 @@ void init(automata *a) {
   }
 }
 
-void apply_rules(automata *a) {
+double apply_rules(automata *a) {
+#if SHOW_CHANGE
+  double change = 0;
+#endif
+
   for (int row = 0; row < a->rows; row++) {
     for (int col = 0; col < a->columns; col++) {
       double sum = 0;
@@ -101,15 +131,28 @@ void apply_rules(automata *a) {
         sum += partial_sum;
       }
 
-      cell *new_cell = &a->new_state[row * a->rows + col];
-      new_cell->temperature =
-          curr_cell.temperature + curr_cell.sign / (double)sqr(24) * sum;
+      cell *new_cell = &a->new_state[row * a->columns + col];
+      new_cell->temperature = curr_cell.temperature + curr_cell.sign /
+                                                          (double)sqr(24) *
+                                                          sum * GROWTH_FACTOR;
+      restric_temp(&new_cell->temperature);
 
+      double temp = curr_cell.temperature - new_cell->temperature;
+      if (temp < 0) {
+        temp *= -1;
+      }
+      change += temp;
+
+#if SIGN_FLIP
       if (rand() <= RAND_MAX / 10) {
         new_cell->sign = curr_cell.sign * (-1);
       }
+#endif
     }
   }
+#if SHOW_CHANGE
+  return change;
+#endif
 }
 
 void update(automata *a) {
@@ -118,7 +161,7 @@ void update(automata *a) {
   a->new_state = temp;
 }
 
-void free_automata(automata *a) {
+void free_automata_part(automata *a) {
   free((void *)a->new_state);
   free((void *)a->old_state);
 }
