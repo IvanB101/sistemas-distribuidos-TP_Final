@@ -1,5 +1,6 @@
 #include "../common/common.h"
 
+#include <omp.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,14 +9,13 @@
 #define SHOW_INICIAL 0
 #define SHOW_FINAL 0
 #define SHOW_STEPS 0
-#define SHOW_CHANGE 1
 #define STEP 1
-#define SIGN_FLIP 1
+#define SIGN_FLIP 0
 #define GROWTH_FACTOR 50
 
 void init(automata *a);
 
-double apply_rules(automata *a);
+void apply_rules(automata *a);
 
 void update(automata *a);
 
@@ -23,9 +23,11 @@ void free_automata_part(automata *a);
 
 int main(int argc, char **argv) {
   uint32_t rows, columns, steps = 100;
+  uint64_t start_t, end_t;
   clock_t start, end;
   double exec_time;
 
+  start_t = time(NULL);
   start = clock();
 
   if (argc != 3 || !(rows = atoi(argv[1])) || !(steps = atoi(argv[2]))) {
@@ -40,19 +42,19 @@ int main(int argc, char **argv) {
       .new_state = NULL,
   };
 
+  omp_set_num_threads(omp_get_num_procs());
+
   init(&a);
 
 #if SHOW_INICIAL
   print_state(a);
 #endif
 
+#pragma omp parallel
   for (int i = 0; i < steps; i++) {
-#if SHOW_CHANGE
-    double change = apply_rules(&a);
-    printf("Change: %lf", change);
-#else
     apply_rules(&a);
-#endif
+#pragma omp barrier
+#pragma omp single
     update(&a);
 #if SHOW_STEPS
     if (!(i % STEP)) {
@@ -68,8 +70,9 @@ int main(int argc, char **argv) {
   free_automata_part(&a);
 
   end = clock();
-  exec_time = ((double)end - start) / CLOCKS_PER_SEC;
-  printf("Tiempo de ejecucion: %lf\n", exec_time);
+  end_t = time(NULL);
+  printf("Tiempo de CPU: %lf\n", ((double)end - start) / CLOCKS_PER_SEC);
+  printf("Tiempo de ejecucion: %ld\n", end_t - start_t);
 
   return 0;
 }
@@ -80,6 +83,7 @@ void init(automata *a) {
   a->new_state = (cell *)malloc(sizeof(cell) * a->rows * a->columns);
   a->old_state = (cell *)malloc(sizeof(cell) * a->rows * a->columns);
 
+#pragma omp parallel for
   for (uint64_t c = 0; c < a->rows * a->columns; c++) {
     double temp = rand() / (double)RAND_MAX * 272 * 2 - 272;
     double conduc = rand() / 2.0 / RAND_MAX;
@@ -94,12 +98,8 @@ void init(automata *a) {
   }
 }
 
-double apply_rules(automata *a) {
-#if SHOW_CHANGE
-  double change = 0;
-#endif
-
-#pragma omp parallel for collapse(2)
+void apply_rules(automata *a) {
+#pragma omp for collapse(2)
   for (int row = 0; row < a->rows; row++) {
     for (int col = 0; col < a->columns; col++) {
       double sum = 0;
@@ -142,7 +142,6 @@ double apply_rules(automata *a) {
       if (temp < 0) {
         temp *= -1;
       }
-      change += temp;
 
 #if SIGN_FLIP
       if (rand() <= RAND_MAX / 10) {
@@ -151,9 +150,6 @@ double apply_rules(automata *a) {
 #endif
     }
   }
-#if SHOW_CHANGE
-  return change;
-#endif
 }
 
 void update(automata *a) {

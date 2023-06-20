@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <time.h>
 
+// Los estados solamente pueden ser mostrados para matrices con lados multiplo
+// de 4
 #define SHOW_INICIAL 0
 #define SHOW_FINAL 0
 #define SHOW_STEPS 0
@@ -29,10 +31,7 @@ void free_automata(automata_part *a);
 
 int main(int argc, char **argv) {
   uint32_t rows, columns, steps = 100;
-  clock_t start;
   int id, n_proc;
-
-  start = clock();
 
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &id);
@@ -60,10 +59,6 @@ int main(int argc, char **argv) {
     slave(&a, id, n_proc, steps);
   }
 
-  if (id == 0) {
-  } else {
-  }
-
   free_automata(&a);
 
   MPI_Finalize();
@@ -72,7 +67,13 @@ int main(int argc, char **argv) {
 }
 
 void master(automata_part *a, int id, int n_proc, int steps) {
+  uint64_t start_t, end_t;
+  clock_t start, end;
   int count = a->size * sizeof(cell);
+
+  start_t = time(NULL);
+  start = clock();
+
   automata full = {
       .rows = a->rows,
       .columns = a->rows,
@@ -85,27 +86,29 @@ void master(automata_part *a, int id, int n_proc, int steps) {
              MPI_BYTE, 0, MPI_COMM_WORLD);
   print_state(full);
 #endif
-
   for (int i = 0; i < steps; i++) {
     apply_rules(a, id, n_proc);
     sinc_parts(a, id, n_proc);
     update(a);
 #if SHOW_STEPS
     if (!(i % STEP)) {
-      MPI_Gather(a->old_state + a->first, count, MPI_BYTE, full.old_state,
+      MPI_Gather(&a->old_state[a->first], count, MPI_BYTE, &full.old_state[0],
                  count, MPI_BYTE, 0, MPI_COMM_WORLD);
       print_state(full);
     }
 #endif
   }
-
 #if SHOW_FINAL
   MPI_Gather(a->old_state + a->first, count, MPI_BYTE, full.old_state, count,
              MPI_BYTE, 0, MPI_COMM_WORLD);
   print_state(full);
 #endif
-
   free(full.old_state);
+
+  end = clock();
+  end_t = time(NULL);
+  printf("Tiempo de CPU: %lf\n", ((double)end - start) / CLOCKS_PER_SEC);
+  printf("Tiempo de ejecucion: %ld\n", end_t - start_t);
 }
 
 void slave(automata_part *a, int id, int n_proc, int steps) {
@@ -120,7 +123,7 @@ void slave(automata_part *a, int id, int n_proc, int steps) {
     update(a);
 #if SHOW_STEPS
     if (!(i % STEP)) {
-      MPI_Gather(a->old_state + a->first, a->size * sizeof(cell), MPI_BYTE,
+      MPI_Gather(&a->old_state[a->first], a->size * sizeof(cell), MPI_BYTE,
                  NULL, 0, MPI_BYTE, 0, MPI_COMM_WORLD);
     }
 #endif

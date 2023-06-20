@@ -8,14 +8,14 @@
 #define SHOW_INICIAL 0
 #define SHOW_FINAL 0
 #define SHOW_STEPS 0
-#define SHOW_CHANGE 1
+#define SHOW_CHANGE 0
 #define STEP 1
 #define SIGN_FLIP 1
 #define GROWTH_FACTOR 50
 
 void init(automata *a);
 
-double apply_rules(automata *a);
+void apply_rules(automata *a);
 
 void update(automata *a);
 
@@ -23,9 +23,10 @@ void free_automata_part(automata *a);
 
 int main(int argc, char **argv) {
   uint32_t rows, columns, steps = 100;
+  uint64_t start_t, end_t;
   clock_t start, end;
-  double exec_time;
 
+  start_t = time(NULL);
   start = clock();
 
   if (argc != 3 || !(rows = atoi(argv[1])) || !(steps = atoi(argv[2]))) {
@@ -47,12 +48,7 @@ int main(int argc, char **argv) {
 #endif
 
   for (int i = 0; i < steps; i++) {
-#if SHOW_CHANGE
-    double change = apply_rules(&a);
-    printf("Change: %lf", change);
-#else
     apply_rules(&a);
-#endif
     update(&a);
 #if SHOW_STEPS
     if (!(i % STEP)) {
@@ -68,8 +64,9 @@ int main(int argc, char **argv) {
   free_automata_part(&a);
 
   end = clock();
-  exec_time = ((double)end - start) / CLOCKS_PER_SEC;
-  printf("Tiempo de ejecucion: %lf\n", exec_time);
+  end_t = time(NULL);
+  printf("Tiempo de CPU: %lf\n", ((double)end - start) / CLOCKS_PER_SEC);
+  printf("Tiempo de ejecucion: %ld\n", end_t - start_t);
 
   return 0;
 }
@@ -94,7 +91,7 @@ void init(automata *a) {
   }
 }
 
-double apply_rules(automata *a) {
+void apply_rules(automata *a) {
 #if SHOW_CHANGE
   double change = 0;
 #endif
@@ -141,7 +138,9 @@ double apply_rules(automata *a) {
       if (temp < 0) {
         temp *= -1;
       }
+#if SHOW_CHANGE
       change += temp;
+#endif
 
 #if SIGN_FLIP
       if (rand() <= RAND_MAX / 10) {
@@ -151,7 +150,7 @@ double apply_rules(automata *a) {
     }
   }
 #if SHOW_CHANGE
-  return change;
+  printf("Change: %d\n", change);
 #endif
 }
 
