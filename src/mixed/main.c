@@ -95,15 +95,17 @@ void master(automata_part *a, int id, int n_proc, int steps) {
     apply_rules(a, id, n_proc);
 #pragma omp barrier
 #pragma omp single
-    sinc_parts(a, id, n_proc);
-    update(a);
+    {
+      sinc_parts(a, id, n_proc);
+      update(a);
 #if SHOW_STEPS
-    if (!(i % STEP)) {
-      MPI_Gather(&a->old_state[a->first], count, MPI_BYTE, &full.old_state[0],
-                 count, MPI_BYTE, 0, MPI_COMM_WORLD);
-      print_state(full);
-    }
+      if (!(i % STEP)) {
+        MPI_Gather(&a->old_state[a->first], count, MPI_BYTE, &full.old_state[0],
+                   count, MPI_BYTE, 0, MPI_COMM_WORLD);
+        print_state(full);
+      }
 #endif
+    }
   }
 #if SHOW_FINAL
   MPI_Gather(a->old_state + a->first, count, MPI_BYTE, full.old_state, count,
@@ -129,14 +131,16 @@ void slave(automata_part *a, int id, int n_proc, int steps) {
     apply_rules(a, id, n_proc);
 #pragma omp barrier
 #pragma omp single
-    sinc_parts(a, id, n_proc);
-    update(a);
+    {
+      sinc_parts(a, id, n_proc);
+      update(a);
 #if SHOW_STEPS
-    if (!(i % STEP)) {
-      MPI_Gather(&a->old_state[a->first], a->size * sizeof(cell), MPI_BYTE,
-                 NULL, 0, MPI_BYTE, 0, MPI_COMM_WORLD);
-    }
+      if (!(i % STEP)) {
+        MPI_Gather(&a->old_state[a->first], a->size * sizeof(cell), MPI_BYTE,
+                   NULL, 0, MPI_BYTE, 0, MPI_COMM_WORLD);
+      }
 #endif
+    }
   }
 
 #if SHOW_FINAL

@@ -11,7 +11,7 @@
 #define SHOW_CHANGE 0
 #define STEP 1
 #define SIGN_FLIP 1
-#define GROWTH_FACTOR 50
+#define GROWTH_FACTOR 10
 
 void init(automata *a);
 
@@ -134,11 +134,11 @@ void apply_rules(automata *a) {
                                                           sum * GROWTH_FACTOR;
       restric_temp(&new_cell->temperature);
 
+#if SHOW_CHANGE
       double temp = curr_cell.temperature - new_cell->temperature;
       if (temp < 0) {
         temp *= -1;
       }
-#if SHOW_CHANGE
       change += temp;
 #endif
 
@@ -150,7 +150,7 @@ void apply_rules(automata *a) {
     }
   }
 #if SHOW_CHANGE
-  printf("Change: %d\n", change);
+  printf("Change: %lf\n", change);
 #endif
 }
 

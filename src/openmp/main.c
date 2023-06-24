@@ -55,12 +55,14 @@ int main(int argc, char **argv) {
     apply_rules(&a);
 #pragma omp barrier
 #pragma omp single
-    update(&a);
+    {
+      update(&a);
 #if SHOW_STEPS
-    if (!(i % STEP)) {
-      print_state(a);
-    }
+      if (!(i % STEP)) {
+        print_state(a);
+      }
 #endif
+    }
   }
 
 #if SHOW_INICIAL
